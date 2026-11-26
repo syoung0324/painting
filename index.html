@@ -196,15 +196,9 @@
       font-size: 14px;
       transition: border-color 0.15s, background 0.15s;
     }
-    .size-trigger:hover:not(:disabled) {
+    .size-trigger:hover {
       background: #eef2f7;
       border-color: #3498db;
-    }
-    .size-trigger:disabled {
-      cursor: not-allowed;
-      background: #f1f2f6;
-      color: #636e72;
-      opacity: 0.9;
     }
     .size-trigger .preview-wrap {
       display: flex;
@@ -327,8 +321,8 @@
       <div class="swatch" style="background:#ffffff" data-color="#ffffff" title="白色"></div>
     </div>
 
-    <!-- 筆觸粗細選單 -->
-    <div class="tool-group">
+    <!-- 筆觸粗細選單（僅畫筆模式顯示） -->
+    <div class="tool-group" id="sizeGroup">
       <div class="size-dropdown" id="sizeDropdown">
         <button type="button" class="size-trigger" id="sizeTrigger" title="選擇筆觸粗細">
           <span class="preview-wrap">
@@ -336,7 +330,7 @@
             <span class="line-preview" id="triggerLinePreview" style="height: 4px;"></span>
             <span id="sizeLabel">4px</span>
           </span>
-          <span id="sizeArrow" style="font-size: 11px; color: #666;">▼</span>
+          <span style="font-size: 11px; color: #666;">▼</span>
         </button>
         <div class="size-menu" id="sizeMenu"></div>
       </div>
@@ -395,11 +389,11 @@
     const clearBtn = document.getElementById('clearBtn');
     const downloadBtn = document.getElementById('downloadBtn');
 
+    const sizeGroup = document.getElementById('sizeGroup');
     const sizeDropdown = document.getElementById('sizeDropdown');
     const sizeTrigger = document.getElementById('sizeTrigger');
     const sizeMenu = document.getElementById('sizeMenu');
     const sizeLabel = document.getElementById('sizeLabel');
-    const sizeArrow = document.getElementById('sizeArrow');
     const triggerLinePreview = document.getElementById('triggerLinePreview');
 
     // 畫筆固定三種尺寸，橡皮擦固定 22px
@@ -429,21 +423,15 @@
       return currentTool === 'eraser' ? ERASER_SIZE : selectedBrushSize;
     }
 
-    // 同步更新粗細選單顯示狀態
+    // 同步更新粗細選單顯示狀態（橡皮擦模式隱藏）
     function updateSizeDisplay() {
       if (currentTool === 'eraser') {
-        sizeTrigger.disabled = true;
         sizeMenu.classList.remove('open');
-        sizeLabel.textContent = `${ERASER_SIZE}px (固定)`;
-        triggerLinePreview.style.height = '14px';
-        triggerLinePreview.style.background = '#ff8a9b';
-        sizeArrow.style.visibility = 'hidden';
+        sizeGroup.style.display = 'none';
       } else {
-        sizeTrigger.disabled = false;
+        sizeGroup.style.display = 'flex';
         sizeLabel.textContent = `${selectedBrushSize}px`;
         triggerLinePreview.style.height = `${selectedBrushSize}px`;
-        triggerLinePreview.style.background = '#2c3e50';
-        sizeArrow.style.visibility = 'visible';
       }
     }
 
@@ -849,7 +837,6 @@
     }
 
     sizeTrigger.onclick = (e) => {
-      if (currentTool === 'eraser') return;
       e.stopPropagation();
       sizeMenu.classList.toggle('open');
     };
