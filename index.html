@@ -314,12 +314,13 @@
       <button class="tool-btn" id="eraserBtn">🧽 橡皮擦</button>
     </div>
 
-    <!-- 固定 8 色選擇：紅色、黃色、橘色、藍色、灰色、咖啡色、黑色、白色 -->
+    <!-- 固定 9 色選擇：深紅色、黃色、橘色、深藍色、深綠色、灰色、咖啡色、黑色、白色 -->
     <div class="tool-group" id="swatches">
-      <div class="swatch" style="background:#e74c3c" data-color="#e74c3c" title="紅色"></div>
+      <div class="swatch" style="background:#b71c1c" data-color="#b71c1c" title="深紅色"></div>
       <div class="swatch" style="background:#f1c40f" data-color="#f1c40f" title="黃色"></div>
       <div class="swatch" style="background:#e67e22" data-color="#e67e22" title="橘色"></div>
-      <div class="swatch" style="background:#3498db" data-color="#3498db" title="藍色"></div>
+      <div class="swatch" style="background:#0d47a1" data-color="#0d47a1" title="深藍色"></div>
+      <div class="swatch" style="background:#1b5e20" data-color="#1b5e20" title="深綠色"></div>
       <div class="swatch" style="background:#7f8c8d" data-color="#7f8c8d" title="灰色"></div>
       <div class="swatch" style="background:#795548" data-color="#795548" title="咖啡色"></div>
       <div class="swatch active" style="background:#000000" data-color="#000000" title="黑色"></div>
@@ -515,7 +516,6 @@
         }
       }
 
-      // 若目前沒有在輸入名稱中，重新渲染分頁列
       if (!editingTabId) {
         renderTabs();
       }
@@ -816,7 +816,7 @@
       updateCursor();
     };
 
-    // 固定 8 色選擇
+    // 固定 9 色選擇
     document.querySelectorAll('.swatch').forEach(swatch => {
       swatch.onclick = () => {
         document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
