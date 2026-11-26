@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>多人同步小畫家</title>
+  <style>
+    :root {
+      --canvas-cursor: crosshair;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* 畫布分頁列 */
+    .tabs-bar {
+      display: flex;
+      align-items: center;
+      background: #2c3e50;
+      padding: 8px 12px 0;
+      gap: 6px;
+      overflow-x: auto;
+    }
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #34495e;
+      color: #ecf0f1;
+      padding: 8px 14px;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      font-size: 14px;
+      white-space: nowrap;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .tab.active {
+      background: #ffffff;
+      color: #2c3e50;
+      font-weight: 600;
+    }
+    .tab .close-btn {
+      font-size: 16px;
+      line-height: 1;
+      opacity: 0.7;
+      border-radius: 50%;
+      padding: 0 4px;
+    }
+    .tab .close-btn:hover { opacity: 1; background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+    .add-tab-btn {
+      background: #27ae60;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .add-tab-btn:hover { background: #219150; }
+
+    /* 連線狀態標籤 */
+    .sync-status {
+      margin-left: auto;
+      margin-bottom: 6px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.12);
+      color: #ecf0f1;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f1c40f;
+    }
+    .sync-status.online .status-dot { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+    .sync-status.error .status-dot { background: #e74c3c; }
+
+    /* 工具列 */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      background: #ffffff;
+      padding: 10px 16px;
+      border-bottom: 1px solid #dcdde1;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+      z-index: 10;
+    }
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tool-btn {
+      padding: 6px 12px;
+      border: 1px solid #ced6e0;
+      background: #f8f9fa;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .tool-btn.active {
+      background: #3498db;
+      color: #fff;
+      border-color: #2980b9;
+    }
+    .tool-btn.danger:hover {
+      background: #e74c3c;
+      color: #fff;
+      border-color: #c0392b;
+    }
+    .swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px #ccc;
+      cursor: pointer;
+    }
+    .swatch.active {
+      box-shadow: 0 0 0 2px #3498db;
+      transform: scale(1.1);
+    }
+    input[type="color"] {
+      width: 30px;
+      height: 30px;
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+
+    /* 筆觸粗細下拉選單 */
+    .size-dropdown {
+      position: relative;
+      user-select: none;
+    }
+    .size-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 155px;
+      padding: 6px 12px;
+      border: 1px solid #ced6e0;
+      background: #f8f9fa;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .size-trigger:hover {
+      background: #eef2f7;
+      border-color: #3498db;
+    }
+    .size-trigger .preview-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    .size-trigger .line-preview {
+      width: 44px;
+      background: #2c3e50;
+      border-radius: 99px;
+      display: inline-block;
+    }
+    .size-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      width: 210px;
+      background: #ffffff;
+      border: 1px solid #dcdde1;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+      padding: 6px;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 100;
+    }
+    .size-menu.open {
+      display: flex;
+    }
+    .size-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .size-option:hover {
+      background: #f1f5f9;
+    }
+    .size-option.active {
+      background: #e8f4fd;
+      color: #1d6fa5;
+      font-weight: 600;
+    }
+    .size-option .stroke-sample-box {
+      flex: 1;
+      height: 28px;
+      display: flex;
+      align-items: center;
+    }
+    .size-option .stroke-bar {
+      width: 100%;
+      background: #2c3e50;
+      border-radius: 99px;
+    }
+    .size-option.active .stroke-bar {
+      background: #2980b9;
+    }
+    .size-option .stroke-text {
+      font-size: 13px;
+      white-space: nowrap;
+      min-width: 64px;
+      text-align: right;
+    }
+
+    /* 畫布工作區 */
+    .workspace {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      overflow: auto;
+      touch-action: none;
+    }
+    canvas {
+      background: #ffffff;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      border-radius: 4px;
+      cursor: var(--canvas-cursor);
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 畫布分頁管理 -->
+  <div class="tabs-bar" id="tabsBar">
+    <button class="add-tab-btn" id="addCanvasBtn">+ 新增畫布</button>
+    <div class="sync-status" id="syncStatus">
+      <span class="status-dot"></span>
+      <span id="syncText">連線中...</span>
+    </div>
+  </div>
+
+  <!-- 繪圖工具列 -->
+  <div class="toolbar">
+    <div class="tool-group">
+      <button class="tool-btn active" id="brushBtn">🖌️ 畫筆</button>
+      <button class="tool-btn" id="eraserBtn">🧽 橡皮擦</button>
+    </div>
+
+    <div class="tool-group" id="swatches">
+      <div class="swatch active" style="background:#000000" data-color="#000000"></div>
+      <div class="swatch" style="background:#e74c3c" data-color="#e74c3c"></div>
+      <div class="swatch" style="background:#3498db" data-color="#3498db"></div>
+      <div class="swatch" style="background:#2ecc71" data-color="#2ecc71"></div>
+      <div class="swatch" style="background:#f1c40f" data-color="#f1c40f"></div>
+      <input type="color" id="colorPicker" value="#000000" title="自訂顏色" />
+    </div>
+
+    <!-- 筆觸粗細選單 -->
+    <div class="tool-group">
+      <div class="size-dropdown" id="sizeDropdown">
+        <button type="button" class="size-trigger" id="sizeTrigger" title="選擇筆觸粗細">
+          <span class="preview-wrap">
+            <span>粗細：</span>
+            <span class="line-preview" id="triggerLinePreview" style="height: 4px;"></span>
+            <span id="sizeLabel">4px</span>
+          </span>
+          <span style="font-size: 11px; color: #666;">▼</span>
+        </button>
+        <div class="size-menu" id="sizeMenu"></div>
+      </div>
+    </div>
+
+    <div class="tool-group" style="margin-left:auto;">
+      <button class="tool-btn danger" id="clearBtn">清空目前畫布</button>
+      <button class="tool-btn" id="downloadBtn">下載圖片</button>
+    </div>
+  </div>
+
+  <!-- 畫布容器 -->
+  <div class="workspace" id="workspace">
+    <canvas id="mainCanvas" width="960" height="620"></canvas>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      doc,
+      addDoc,
+      setDoc,
+      updateDoc,
+      deleteDoc,
+      getDocs,
+      onSnapshot,
+      query,
+      orderBy,
+      serverTimestamp,
+      writeBatch
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+    // Firebase 資料庫參數設定
+    const firebaseConfig = {
+      apiKey: "AIzaSyB2MQl07PqEjVCT19tvANkXtLsL01o_QQc",
+      authDomain: "painting-925a6.firebaseapp.com",
+      projectId: "painting-925a6",
+      storageBucket: "painting-925a6.firebasestorage.app",
+      messagingSenderId: "1090583684410",
+      appId: "1:1090583684410:web:79541e8f9f78173c0cdc03"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 辨識目前瀏覽器分頁的唯一 ID
+    const clientId = 'user_' + Math.random().toString(36).substring(2, 10);
+
+    // DOM 元素
+    const tabsBar = document.getElementById('tabsBar');
+    const addCanvasBtn = document.getElementById('addCanvasBtn');
+    const syncStatus = document.getElementById('syncStatus');
+    const syncText = document.getElementById('syncText');
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const brushBtn = document.getElementById('brushBtn');
+    const eraserBtn = document.getElementById('eraserBtn');
+    const colorPicker = document.getElementById('colorPicker');
+    const clearBtn = document.getElementById('clearBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    const sizeDropdown = document.getElementById('sizeDropdown');
+    const sizeTrigger = document.getElementById('sizeTrigger');
+    const sizeMenu = document.getElementById('sizeMenu');
+    const sizeLabel = document.getElementById('sizeLabel');
+    const triggerLinePreview = document.getElementById('triggerLinePreview');
+
+    const strokeSizes = [
+      { size: 2,  name: '極細' },
+      { size: 4,  name: '細' },
+      { size: 8,  name: '適中' },
+      { size: 14, name: '中粗' },
+      { size: 22, name: '粗' },
+      { size: 32, name: '極粗' },
+      { size: 44, name: '特粗' }
+    ];
+
+    let canvasesList = [];
+    let activeId = null;
+    let unsubscribeStrokes = null;
+    let renderedStrokeIds = new Set();
+    let currentClearedAt = 0;
+    let isInitializing = false;
+
+    let currentTool = 'brush';
+    let currentColor = '#000000';
+    let currentSize = 4;
+    let isDrawing = false;
+    let currentStrokePoints = [];
+
+    // 更新連線狀態顯示
+    function setSyncState(state, text) {
+      syncStatus.className = 'sync-status ' + state;
+      syncText.textContent = text;
+    }
+
+    // 清空本地畫布畫面（填滿白底）
+    function resetCanvasSurface() {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+
+    // 繪製單一筆畫資料
+    function drawStroke(stroke) {
+      const pts = stroke.points;
+      if (!pts || pts.length === 0) return;
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = stroke.size || 4;
+      ctx.strokeStyle = stroke.tool === 'eraser' ? '#ffffff' : (stroke.color || '#000000');
+
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      if (pts.length === 1) {
+        ctx.lineTo(pts[0].x + 0.1, pts[0].y + 0.1);
+      } else {
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 監聽 Firestore 畫布清單
+    const canvasesCol = collection(db, 'canvases');
+    const canvasesQuery = query(canvasesCol, orderBy('createdAt', 'asc'));
+
+    onSnapshot(canvasesQuery, async (snapshot) => {
+      setSyncState('online', '已連線・多人即時同步');
+
+      // 若資料庫尚無任何畫布，自動建立第一張
+      if (snapshot.empty && !isInitializing) {
+        isInitializing = true;
+        await createCanvasInFirestore('畫布 1');
+        isInitializing = false;
+        return;
+      }
+
+      canvasesList = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+
+      // 若目前沒有選中畫布，或選中的畫布已被其他人刪除，自動切到第一張
+      const activeCanvasObj = canvasesList.find(c => c.id === activeId);
+      if (!activeCanvasObj && canvasesList.length > 0) {
+        switchCanvas(canvasesList[0].id);
+      } else if (activeCanvasObj) {
+        // 偵測其他人是否按下了「清空目前畫布」
+        const newClearedAt = activeCanvasObj.clearedAt || 0;
+        if (newClearedAt !== currentClearedAt) {
+          currentClearedAt = newClearedAt;
+          renderedStrokeIds.clear();
+          resetCanvasSurface();
+        }
+      }
+
+      renderTabs();
+    }, (error) => {
+      console.error('Firestore 連線失敗:', error);
+      setSyncState('error', '連線失敗 (請檢查權限規則)');
+    });
+
+    // 在 Firestore 建立新畫布
+    async function createCanvasInFirestore(customName) {
+      const nextNum = canvasesList.length + 1;
+      const name = customName || `畫布 ${nextNum}`;
+      const newDocRef = doc(canvasesCol);
+      await setDoc(newDocRef, {
+        name,
+        createdAt: Date.now(),
+        clearedAt: 0
+      });
+      switchCanvas(newDocRef.id);
+    }
+
+    // 切換目前檢視的畫布並訂閱該畫布筆畫
+    function switchCanvas(id) {
+      if (activeId === id && unsubscribeStrokes) return;
+      activeId = id;
+      renderTabs();
+
+      if (unsubscribeStrokes) {
+        unsubscribeStrokes();
+        unsubscribeStrokes = null;
+      }
+
+      const targetCanvas = canvasesList.find(c => c.id === id);
+      currentClearedAt = targetCanvas ? (targetCanvas.clearedAt || 0) : 0;
+      renderedStrokeIds.clear();
+      resetCanvasSurface();
+
+      // 訂閱該畫布的筆畫子集合
+      const strokesCol = collection(db, 'canvases', id, 'strokes');
+      const strokesQuery = query(strokesCol, orderBy('timestamp', 'asc'));
+
+      unsubscribeStrokes = onSnapshot(strokesQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const strokeId = change.doc.id;
+            const data = change.doc.data();
+            // 僅繪製尚未繪製過，且建立時間晚於最後一次清空時間的筆畫
+            if (!renderedStrokeIds.has(strokeId) && (data.timestamp || 0) >= currentClearedAt) {
+              renderedStrokeIds.add(strokeId);
+              drawStroke(data);
+            }
+          }
+        });
+      });
+    }
+
+    // 刪除畫布（連同子集合筆畫一併清理）
+    async function deleteCanvas(id, e) {
+      e.stopPropagation();
+      if (canvasesList.length <= 1) {
+        alert('至少需要保留一張畫布！');
+        return;
+      }
+      if (!confirm('確定要刪除這張畫布嗎？（所有人的畫面都會同步移除）')) return;
+
+      try {
+        // 先批次刪除筆畫子集合
+        const strokesSnap = await getDocs(collection(db, 'canvases', id, 'strokes'));
+        const batch = writeBatch(db);
+        strokesSnap.forEach(d => batch.delete(d.ref));
+        batch.delete(doc(db, 'canvases', id));
+        await batch.commit();
+      } catch (err) {
+        console.error('刪除畫布失敗:', err);
+      }
+    }
+
+    // 渲染上方畫布分頁列
+    function renderTabs() {
+      document.querySelectorAll('.tab').forEach(el => el.remove());
+      canvasesList.forEach(item => {
+        const tab = document.createElement('div');
+        tab.className = 'tab' + (item.id === activeId ? ' active' : '');
+        tab.innerHTML = `<span>${item.name}</span><span class="close-btn" title="刪除畫布">&times;</span>`;
+        tab.onclick = () => switchCanvas(item.id);
+        tab.querySelector('.close-btn').onclick = (e) => deleteCanvas(item.id, e);
+        tabsBar.insertBefore(tab, addCanvasBtn);
+      });
+    }
+
+    // 將滑鼠/觸控螢幕座標換算為畫布內部 960x620 邏輯座標
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: Math.round((clientX - rect.left) * scaleX * 10) / 10,
+        y: Math.round((clientY - rect.top) * scaleY * 10) / 10
+      };
+    }
+
+    // 繪圖事件處理（本地即時繪製 + 抬筆寫入 Firestore）
+    const startDraw = (e) => {
+      if (!activeId) return;
+      e.preventDefault();
+      isDrawing = true;
+      const pos = getPos(e);
+      currentStrokePoints = [pos];
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = currentSize;
+      ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      ctx.lineTo(pos.x + 0.1, pos.y + 0.1);
+      ctx.stroke();
+    };
+
+    const moveDraw = (e) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      currentStrokePoints.push(pos);
+
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    };
+
+    const endDraw = async () => {
+      if (!isDrawing) return;
+      isDrawing = false;
+      ctx.closePath();
+      ctx.restore();
+
+      if (!activeId || currentStrokePoints.length === 0) return;
+
+      const pointsToSave = [...currentStrokePoints];
+      currentStrokePoints = [];
+
+      try {
+        const strokesCol = collection(db, 'canvases', activeId, 'strokes');
+        const newStrokeRef = doc(strokesCol);
+        // 先標記此筆畫已本地繪製，避免 onSnapshot 回傳時重複疊畫
+        renderedStrokeIds.add(newStrokeRef.id);
+
+        await setDoc(newStrokeRef, {
+          points: pointsToSave,
+          color: currentColor,
+          size: Number(currentSize),
+          tool: currentTool,
+          clientId,
+          timestamp: Date.now()
+        });
+      } catch (err) {
+        console.error('儲存筆畫失敗:', err);
+        setSyncState('error', '同步失敗');
+      }
+    };
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', moveDraw);
+    window.addEventListener('mouseup', endDraw);
+
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', moveDraw, { passive: false });
+    window.addEventListener('touchend', endDraw);
+
+    // 清空目前畫布（同步通知所有使用者並清理舊筆畫）
+    clearBtn.onclick = async () => {
+      if (!activeId) return;
+      try {
+        const now = Date.now();
+        currentClearedAt = now;
+        renderedStrokeIds.clear();
+        resetCanvasSurface();
+
+        // 更新畫布清空時間戳記，讓其他線上用戶瞬間清空
+        await updateDoc(doc(db, 'canvases', activeId), {
+          clearedAt: now
+        });
+
+        // 背景清理舊筆畫文件節省資料庫空間
+        const strokesSnap = await getDocs(collection(db, 'canvases', activeId, 'strokes'));
+        const batch = writeBatch(db);
+        strokesSnap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      } catch (err) {
+        console.error('清空畫布失敗:', err);
+      }
+    };
+
+    // 下載圖片
+    downloadBtn.onclick = () => {
+      const current = canvasesList.find(c => c.id === activeId);
+      const fileName = current ? current.name : '畫布';
+      const link = document.createElement('a');
+      link.download = `${fileName}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+
+    addCanvasBtn.onclick = () => createCanvasInFirestore();
+
+    // 工具切換
+    brushBtn.onclick = () => {
+      currentTool = 'brush';
+      brushBtn.classList.add('active');
+      eraserBtn.classList.remove('active');
+      updateCursor();
+    };
+
+    eraserBtn.onclick = () => {
+      currentTool = 'eraser';
+      eraserBtn.classList.add('active');
+      brushBtn.classList.remove('active');
+      updateCursor();
+    };
+
+    // 顏色選擇
+    document.querySelectorAll('.swatch').forEach(swatch => {
+      swatch.onclick = () => {
+        document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+        currentColor = swatch.dataset.color;
+        colorPicker.value = currentColor;
+        brushBtn.click();
+      };
+    });
+
+    colorPicker.oninput = (e) => {
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      currentColor = e.target.value;
+      brushBtn.click();
+    };
+
+    // 筆觸粗細下拉選單
+    function renderSizeMenu() {
+      sizeMenu.innerHTML = '';
+      strokeSizes.forEach(item => {
+        const option = document.createElement('div');
+        option.className = 'size-option' + (item.size === currentSize ? ' active' : '');
+        const visualHeight = Math.min(item.size, 24);
+        option.innerHTML = `
+          <div class="stroke-sample-box">
+            <div class="stroke-bar" style="height: ${visualHeight}px;"></div>
+          </div>
+          <span class="stroke-text">${item.name} (${item.size}px)</span>
+        `;
+        option.onclick = () => {
+          currentSize = item.size;
+          sizeLabel.textContent = `${item.size}px`;
+          triggerLinePreview.style.height = `${Math.min(item.size, 14)}px`;
+          sizeMenu.classList.remove('open');
+          renderSizeMenu();
+        };
+        sizeMenu.appendChild(option);
+      });
+    }
+
+    sizeTrigger.onclick = (e) => {
+      e.stopPropagation();
+      sizeMenu.classList.toggle('open');
+    };
+
+    window.addEventListener('click', (e) => {
+      if (!sizeDropdown.contains(e.target)) {
+        sizeMenu.classList.remove('open');
+      }
+    });
+
+    // 可愛畫筆與橡皮擦游標
+    function updateCursor() {
+      if (currentTool === 'brush') {
+        const brushSvg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+            <path d="M26.5 3.5 C28 5 28 7.5 26.5 9 L14.5 21 L11 17.5 L23 5.5 C24.5 4 25.5 3 26.5 3.5 Z" fill="#f5b041" stroke="#2c3e50" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M11 17.5 L14.5 21 L12 23.5 L8.5 20 Z" fill="#dfe6e9" stroke="#2c3e50" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M8.5 20 L12 23.5 C10.5 27.5 6 29.5 2 30 C2.5 26 4.5 21.5 8.5 20 Z" fill="${currentColor}" stroke="#2c3e50" stroke-width="1.8" stroke-linejoin="round"/>
+            <circle cx="8" cy="23.5" r="1" fill="#ffffff" opacity="0.8"/>
+          </svg>
+        `.trim();
+        const encoded = encodeURIComponent(brushSvg);
+        document.documentElement.style.setProperty('--canvas-cursor', `url("data:image/svg+xml;utf8,${encoded}") 2 30, crosshair`);
+      } else {
+        const eraserSvg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+            <path d="M18 5 L27 14 L13 28 L4 28 L3 21 Z" fill="#ff8a9b" stroke="#2c3e50" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M15 8 L24 17 L17 24 L8 15 Z" fill="#74b9ff" stroke="#2c3e50" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M12.5 10.5 L21.5 19.5" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        `.trim();
+        const encoded = encodeURIComponent(eraserSvg);
+        document.documentElement.style.setProperty('--canvas-cursor', `url("data:image/svg+xml;utf8,${encoded}") 4 28, cell`);
+      }
+    }
+
+    // 初始化介面
+    resetCanvasSurface();
+    renderSizeMenu();
+    updateCursor();
+  </script>
+</body>
+</html>
